@@ -1,0 +1,5 @@
+node_modules/
+
+# Crawled data is regenerable via `npm run crawl` — don't commit large generated blobs.
+# Feel free to remove this if you'd rather keep a snapshot checked in.
+data/*.json

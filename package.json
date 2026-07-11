@@ -1,0 +1,13 @@
+{
+  "name": "stardew-wikirace",
+  "version": "0.1.0",
+  "description": "A WikiRace-style game built on top of the Stardew Valley Wiki link graph.",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "crawl": "node src/crawler/crawl.js"
+  },
+  "license": "MIT"
+}
