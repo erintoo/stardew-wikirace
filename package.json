@@ -9,5 +9,8 @@
   "scripts": {
     "crawl": "node src/crawler/crawl.js"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "prettier": "3.9.10"
+  }
 }
