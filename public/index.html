@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>WikiRace</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <section id="home" class="screen active">
@@ -12,12 +12,109 @@
     </section>
 
     <section id="lobby" class="screen">
-      <h1>Lobby</h1>
-      <button id="start">Start</button>
+      <main class="lobby-card">
+        <h1>Game lobby</h1>
+        <p class="player-name">
+          Playing as <strong id="player-name-display">Selecting name…</strong>
+        </p>
+        <label class="field-label" for="player-name">Player name</label>
+        <input
+          id="player-name"
+          type="text"
+          maxlength="24"
+          autocomplete="nickname"
+          value=""
+        />
+
+        <div class="field-group">
+          <label class="field-label" for="start-page">Starting point</label>
+          <div class="input-with-button">
+            <div class="autocomplete">
+              <input
+                id="start-page"
+                type="text"
+                autocomplete="off"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-controls="start-suggestions"
+                aria-expanded="false"
+              />
+              <ul
+                id="start-suggestions"
+                class="autocomplete-options"
+                role="listbox"
+                hidden
+              ></ul>
+            </div>
+            <button id="random-start" class="secondary-button" type="button">
+              Randomize
+            </button>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="end-page">Ending point</label>
+          <div class="input-with-button">
+            <div class="autocomplete">
+              <input
+                id="end-page"
+                type="text"
+                autocomplete="off"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-controls="end-suggestions"
+                aria-expanded="false"
+              />
+              <ul
+                id="end-suggestions"
+                class="autocomplete-options"
+                role="listbox"
+                hidden
+              ></ul>
+            </div>
+            <button id="random-end" class="secondary-button" type="button">
+              Randomize
+            </button>
+          </div>
+        </div>
+
+        <p class="room-details">
+          Lobby code:
+          <strong id="lobby-code"></strong>
+          <button
+            id="toggle-code"
+            class="text-button"
+            type="button"
+            aria-pressed="false"
+          >
+            Hide
+          </button>
+        </p>
+        <div class="lobby-actions">
+          <button id="invite" class="secondary-button" type="button">
+            Invite
+          </button>
+          <button id="start" type="button">Start game</button>
+        </div>
+        <p
+          id="lobby-message"
+          class="status-message"
+          role="status"
+          aria-live="polite"
+        ></p>
+      </main>
     </section>
 
     <section id="wiki" class="screen">
-      <p id="clicks">Clicks: 0</p>
+      <header class="game-status">
+        <p id="clicks">Clicks: 0</p>
+        <p>Goal: <strong id="target-page"></strong></p>
+      </header>
+      <p
+        id="game-message"
+        class="status-message"
+        role="status"
+        aria-live="polite"
+      ></p>
       <article id="wiki-content"></article>
     </section>
 

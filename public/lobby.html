@@ -1,14 +1,15 @@
-<!-- lobby.html -->
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Lobby</title>
-    <link rel="stylesheet" href="styles.css" />
+    <title>WikiRace Lobby</title>
   </head>
   <body>
-    <h1>Lobby</h1>
-    <button id="start">Start</button>
-    <script src="lobby.js"></script>
+    <p>
+      Opening the lobby… <a href="index.html#lobby">Continue to the lobby</a>
+    </p>
+    <script>
+      window.location.replace(`index.html${window.location.search}#lobby`);
+    </script>
   </body>
 </html>

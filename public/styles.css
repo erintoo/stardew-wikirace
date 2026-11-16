@@ -3,12 +3,170 @@ body {
   font-family: sans-serif;
   text-align: center;
   background: #f4e7b8;
+  color: #382f1d;
+  margin: 0;
+  padding: 32px 16px;
 }
 
 button {
   font-size: 1.2rem;
   padding: 12px 24px;
+  border: 0;
+  border-radius: 6px;
+  background: #517a42;
+  color: #fff;
+  cursor: pointer;
 }
 
-.screen { display: none; }
-.screen.active { display: block; }
+.screen {
+  display: none;
+}
+.screen.active {
+  display: block;
+}
+
+.lobby-card {
+  box-sizing: border-box;
+  width: min(100%, 520px);
+  margin: 32px auto;
+  padding: 28px;
+  border: 2px solid #9a7946;
+  border-radius: 12px;
+  background: #fff9e8;
+  box-shadow: 0 8px 20px rgb(56 47 29 / 12%);
+  text-align: left;
+}
+
+.lobby-card h1,
+.player-name {
+  text-align: center;
+}
+
+.player-name {
+  margin: 0 0 24px;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+
+.lobby-card input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #9a7946;
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+.field-group {
+  margin-top: 20px;
+}
+
+.input-with-button {
+  display: flex;
+  gap: 8px;
+}
+
+.autocomplete {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.autocomplete-options {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid #9a7946;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 4px 10px rgb(56 47 29 / 18%);
+  list-style: none;
+  text-align: left;
+}
+
+.autocomplete-options[hidden] {
+  display: none;
+}
+
+.autocomplete-options li {
+  padding: 8px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.autocomplete-options li:hover,
+.autocomplete-options li[aria-selected="true"] {
+  background: #f4e7b8;
+}
+
+.secondary-button {
+  flex: 0 0 auto;
+  background: #82683e;
+  font-size: 1rem;
+  padding: 10px 14px;
+}
+
+.room-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 24px 0;
+}
+
+.text-button {
+  padding: 4px 8px;
+  background: transparent;
+  color: #385b2e;
+  font-size: 0.95rem;
+  text-decoration: underline;
+}
+
+.lobby-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.status-message {
+  min-height: 1.4em;
+  color: #7a2d21;
+}
+
+.game-status {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+}
+
+#wiki-content {
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+@media (max-width: 480px) {
+  .lobby-card {
+    padding: 20px 16px;
+  }
+
+  .input-with-button {
+    flex-direction: column;
+  }
+
+  .lobby-actions {
+    flex-direction: column;
+  }
+}
