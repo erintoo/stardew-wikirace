@@ -27,7 +27,7 @@ This will:
 2. Fetch every redirect title and resolve it to its real target
    (so a link to `Cauliflower` that redirects to `Cauliflower (item)` counts
    as an edge to `Cauliflower (item)`, not a dead end).
-3. For every real article, fetch its rendered HTML *and* its outgoing links
+3. For every real article, fetch its rendered HTML _and_ its outgoing links
    in a single `action=parse` call.
 4. Filter links down to ones that land on another real article in our set
    (drops redlinks, external links, Category:/File:/Modding: pages, etc.).
@@ -52,14 +52,54 @@ take a few minutes — the wiki has several hundred articles. Config knobs
 - **Self-loops and dangling links are dropped.** If a page links to itself,
   or to something outside our crawled page set, that edge is discarded.
 
-## Next steps (not yet built)
+## Frontend/backend contract
+
+The browser expects the backend to serve the following same-origin endpoints
+under `/api`:
+
+- `GET /pages` returns `{ "titles": ["Page title", ...] }`.
+- `GET /articles?title=...` returns `{ "title": "Canonical title", "html": "..." }`.
+  The backend must sanitize the rendered article HTML before returning it.
+- `POST /rooms` with `{ "playerName": "..." }` creates a room.
+- `POST /rooms/:roomCode/join` with `{ "playerName": "..." }` joins a room.
+- `POST /rooms/:roomCode/start` with
+  `{ "playerId": "...", "startPage": "...", "targetPage": "..." }` starts it.
+- `POST /rooms/:roomCode/moves` with
+  `{ "playerId": "...", "destination": "..." }` submits a move.
+
+Create and join return `{ "playerId": "...", "state": { ... } }`. The room
+state shape is:
+
+```json
+{
+  "roomCode": "ABCD",
+  "status": "lobby",
+  "hostPlayerId": "player-id",
+  "startPage": null,
+  "targetPage": null,
+  "winnerPlayerId": null,
+  "players": [
+    { "id": "player-id", "name": "Farmer", "currentPage": null, "clicks": 0 }
+  ]
+}
+```
+
+`status` is `lobby`, `playing`, or `finished`; `winnerPlayerId` is set when
+there is a winner. Start and move responses return `{ "state": { ... } }`.
+Errors return `{ "error": "Readable error message" }`.
+
+For live updates, the browser opens
+`ws(s)://<host>/api/rooms/:roomCode/events?playerId=...`. The backend should
+broadcast `{ "type": "room_state", "state": { ... } }` whenever the room
+changes. The server remains authoritative: it validates the start request and
+each submitted move against the crawler's link graph.
+
+## Next steps
 
 - `src/graph/bfs.js` — shortest-path / reachability check over `graph.json`,
   used both for picking valid start/end pairs and for scoring runs.
-- HTML sanitization + link-interception layer for rendering `pages.json`
-  content safely in the browser.
-- Express (or similar) API server for single-player game state.
-- Socket.io layer for real-time multiplayer races.
+- Sanitize crawler-rendered HTML before serving it through the backend.
+- Backend implementation of the frontend API contract above.
 
 See the project plan in the conversation this repo came from for the full
 phased breakdown.

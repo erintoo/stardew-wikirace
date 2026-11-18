@@ -1,9 +1,13 @@
-const API = "https://stardewvalleywiki.com/mediawiki/api.php";
-const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-let clicks = 0;
 let pageTitles = [];
-let targetPage = "";
+let pageTitlesError = "";
 let playerNameEdited = false;
+let currentRoomCode = "";
+let currentPlayerId = "";
+let currentRoomState = null;
+let currentArticleTitle = "";
+let requestedArticleTitle = "";
+let articleRequestId = 0;
+let unsubscribeFromRoom = null;
 
 function show(id) {
   document
@@ -16,6 +20,10 @@ function setLobbyMessage(message) {
   document.getElementById("lobby-message").textContent = message;
 }
 
+function setGameMessage(message) {
+  document.getElementById("game-message").textContent = message;
+}
+
 function chooseRandomPage(excludedPage) {
   const choices = pageTitles.filter((title) => title !== excludedPage);
   if (choices.length === 0) {
@@ -25,52 +33,47 @@ function chooseRandomPage(excludedPage) {
   return choices[Math.floor(Math.random() * choices.length)];
 }
 
-function createRoomCode() {
-  return Array.from(
-    { length: 4 },
-    () =>
-      ROOM_CODE_ALPHABET[Math.floor(Math.random() * ROOM_CODE_ALPHABET.length)],
-  ).join("");
-}
-
 async function loadArticle(title) {
-  const url =
-    API +
-    "?action=parse&format=json&prop=text&redirects=1&origin=*" +
-    "&page=" +
-    encodeURIComponent(title);
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`The wiki returned ${response.status}.`);
+  const requestId = ++articleRequestId;
+  requestedArticleTitle = title;
+  let article;
+  try {
+    article = await GameApi.getArticle(title);
+  } catch (error) {
+    if (requestId !== articleRequestId) return;
+    requestedArticleTitle = "";
+    throw error;
   }
-  const data = await response.json();
-  const articleHtml = data.parse && data.parse.text && data.parse.text["*"];
-  if (!articleHtml) {
-    throw new Error("The wiki did not return that article.");
+  if (requestId !== articleRequestId) return;
+  if (!article || typeof article.html !== "string" || !article.html) {
+    requestedArticleTitle = "";
+    throw new Error("The server did not return article content.");
   }
-  document.getElementById("wiki-content").innerHTML = articleHtml;
+
+  document.getElementById("wiki-content").innerHTML = article.html;
+  currentArticleTitle = article.title || title;
+  requestedArticleTitle = "";
 }
 
 async function loadPageTitles() {
   try {
-    const response = await fetch("../data/graph.json");
-    if (!response.ok) {
-      throw new Error(`Could not load wiki pages (${response.status}).`);
+    const data = await GameApi.getPages();
+    if (!Array.isArray(data.titles)) {
+      throw new Error("The server returned an invalid page list.");
     }
-    const graph = await response.json();
-    pageTitles = Object.keys(graph);
+    pageTitles = data.titles;
     if (pageTitles.length < 2) {
       throw new Error("At least two wiki pages are needed to start a game.");
     }
+    pageTitlesError = "";
 
     document.getElementById("start-page").value = chooseRandomPage("");
     document.getElementById("end-page").value = chooseRandomPage(
       document.getElementById("start-page").value,
     );
   } catch (error) {
-    setLobbyMessage(
-      `${error.message} Make sure the app is served with the data folder available.`,
-    );
+    pageTitlesError = error.message;
+    setLobbyMessage(pageTitlesError);
   }
 }
 
@@ -180,13 +183,152 @@ async function loadRandomPlayerName() {
   }
 }
 
-document.getElementById("make-lobby").addEventListener("click", () => {
-  show("lobby");
-  history.pushState(
-    {},
-    "",
-    `${window.location.pathname}${window.location.search}#lobby`,
+function renderPlayers(state) {
+  const playerLists = [
+    document.getElementById("lobby-players"),
+    document.getElementById("game-players"),
+  ];
+
+  playerLists.forEach((list) => {
+    list.replaceChildren();
+    state.players.forEach((player) => {
+      const item = document.createElement("li");
+      const currentPage = player.currentPage
+        ? ` — ${player.currentPage} (${player.clicks} clicks)`
+        : "";
+      item.textContent = `${player.name}${currentPage}`;
+      list.append(item);
+    });
+  });
+}
+
+function renderRoomState(state) {
+  if (
+    !state ||
+    typeof state.roomCode !== "string" ||
+    !Array.isArray(state.players)
+  ) {
+    throw new Error("The server returned an invalid room state.");
+  }
+
+  currentRoomState = state;
+  currentRoomCode = state.roomCode;
+
+  const codeElement = document.getElementById("lobby-code");
+  codeElement.dataset.code = currentRoomCode;
+  codeElement.textContent =
+    document.getElementById("toggle-code").getAttribute("aria-pressed") ===
+    "true"
+      ? "••••"
+      : currentRoomCode;
+
+  renderPlayers(state);
+
+  const player = state.players.find((item) => item.id === currentPlayerId);
+  if (!player) {
+    throw new Error("Your player is missing from the room state.");
+  }
+
+  const startButton = document.getElementById("start");
+  startButton.disabled =
+    state.status !== "lobby" || state.hostPlayerId !== currentPlayerId;
+
+  if (state.startPage) {
+    document.getElementById("start-page").value = state.startPage;
+  }
+  if (state.targetPage) {
+    document.getElementById("end-page").value = state.targetPage;
+  }
+
+  if (state.status === "lobby") {
+    articleRequestId++;
+    currentArticleTitle = "";
+    requestedArticleTitle = "";
+    document.getElementById("wiki-content").replaceChildren();
+    show("lobby");
+    return;
+  }
+
+  if (state.status !== "playing" && state.status !== "finished") {
+    throw new Error("The server returned an unsupported room status.");
+  }
+
+  show("wiki");
+  document.getElementById("clicks").textContent = `Clicks: ${player.clicks}`;
+  document.getElementById("target-page").textContent = state.targetPage || "";
+
+  if (
+    player.currentPage &&
+    player.currentPage !== currentArticleTitle &&
+    player.currentPage !== requestedArticleTitle
+  ) {
+    loadArticle(player.currentPage).catch((error) =>
+      setGameMessage(error.message),
+    );
+  }
+
+  if (state.status === "finished") {
+    const winner = state.players.find(
+      (item) => item.id === state.winnerPlayerId,
+    );
+    setGameMessage(
+      winner
+        ? `${winner.name} reached ${state.targetPage}!`
+        : "The game has finished.",
+    );
+  } else {
+    setGameMessage("");
+  }
+}
+
+function connectToRoom() {
+  if (unsubscribeFromRoom) unsubscribeFromRoom();
+  unsubscribeFromRoom = GameApi.subscribeToRoom(
+    currentRoomCode,
+    currentPlayerId,
+    (state) => {
+      try {
+        renderRoomState(state);
+      } catch (error) {
+        setLobbyMessage(error.message);
+        setGameMessage(error.message);
+      }
+    },
+    (error) => {
+      setLobbyMessage(error.message);
+      setGameMessage(error.message);
+    },
   );
+}
+
+document.getElementById("make-lobby").addEventListener("click", async () => {
+  const button = document.getElementById("make-lobby");
+  button.disabled = true;
+  show("lobby");
+  setLobbyMessage("Connecting to the game server…");
+
+  try {
+    const playerName =
+      document.getElementById("player-name").value.trim() || "Unnamed player";
+    const requestedRoomCode = new URLSearchParams(window.location.search).get(
+      "room",
+    );
+    const result = requestedRoomCode
+      ? await GameApi.joinRoom(requestedRoomCode, playerName)
+      : await GameApi.createRoom(playerName);
+
+    if (!result || !result.playerId || !result.state) {
+      throw new Error("The server returned an incomplete room response.");
+    }
+    currentPlayerId = result.playerId;
+    renderRoomState(result.state);
+    connectToRoom();
+    setLobbyMessage(pageTitlesError);
+  } catch (error) {
+    setLobbyMessage(error.message);
+  } finally {
+    button.disabled = false;
+  }
 });
 
 document.getElementById("player-name").addEventListener("input", (event) => {
@@ -223,16 +365,18 @@ document.getElementById("toggle-code").addEventListener("click", (event) => {
 });
 
 document.getElementById("invite").addEventListener("click", async () => {
+  if (!currentRoomCode) {
+    setLobbyMessage("Create or join a room before inviting players.");
+    return;
+  }
+
   const inviteUrl = new URL(window.location.href);
-  inviteUrl.searchParams.set(
-    "room",
-    document.getElementById("lobby-code").dataset.code,
-  );
-  inviteUrl.hash = "lobby";
+  inviteUrl.searchParams.set("room", currentRoomCode);
+  inviteUrl.hash = "";
   try {
     await navigator.clipboard.writeText(inviteUrl.href);
     setLobbyMessage("Invite link copied.");
-  } catch (error) {
+  } catch {
     setLobbyMessage(
       `Could not copy the invite link. Copy this URL: ${inviteUrl.href}`,
     );
@@ -241,11 +385,13 @@ document.getElementById("invite").addEventListener("click", async () => {
 
 document.getElementById("start").addEventListener("click", async () => {
   const startPage = document.getElementById("start-page").value.trim();
-  targetPage = document.getElementById("end-page").value.trim();
+  const targetPage = document.getElementById("end-page").value.trim();
+  if (!currentRoomCode || !currentPlayerId) {
+    setLobbyMessage("Create or join a room before starting the game.");
+    return;
+  }
   if (!pageTitles.includes(startPage) || !pageTitles.includes(targetPage)) {
-    setLobbyMessage(
-      "Choose a starting point and ending point from the wiki pages.",
-    );
+    setLobbyMessage("Choose start and target pages from the suggestions.");
     return;
   }
   if (startPage === targetPage) {
@@ -253,15 +399,21 @@ document.getElementById("start").addEventListener("click", async () => {
     return;
   }
 
-  clicks = 0;
-  document.getElementById("clicks").textContent = "Clicks: 0";
-  document.getElementById("target-page").textContent = targetPage;
-  document.getElementById("game-message").textContent = "";
-  show("wiki");
+  const button = document.getElementById("start");
+  button.disabled = true;
   try {
-    await loadArticle(startPage);
+    const result = await GameApi.startGame(
+      currentRoomCode,
+      currentPlayerId,
+      startPage,
+      targetPage,
+    );
+    renderRoomState(result.state);
+    setLobbyMessage("");
   } catch (error) {
-    document.getElementById("game-message").textContent = error.message;
+    setLobbyMessage(error.message);
+  } finally {
+    button.disabled = currentRoomState?.hostPlayerId !== currentPlayerId;
   }
 });
 
@@ -271,37 +423,28 @@ document
     const link = event.target.closest("a");
     if (!link) return;
     event.preventDefault();
+
     const href = link.getAttribute("href");
-    if (href && href.startsWith("/") && !href.includes(":")) {
-      clicks++;
-      document.getElementById("clicks").textContent = "Clicks: " + clicks;
-      try {
-        const title = decodeURIComponent(href.slice(1)).replace(/_/g, " ");
-        await loadArticle(title);
-        if (title === targetPage) {
-          document.getElementById("game-message").textContent =
-            `You reached ${targetPage} in ${clicks} clicks!`;
-        } else {
-          document.getElementById("game-message").textContent = "";
-        }
-      } catch (error) {
-        document.getElementById("game-message").textContent = error.message;
-      }
+    if (!href || !href.startsWith("/") || href.startsWith("//")) return;
+
+    try {
+      const title = decodeURIComponent(href.slice(1)).replace(/_/g, " ");
+      const result = await GameApi.submitMove(
+        currentRoomCode,
+        currentPlayerId,
+        title,
+      );
+      renderRoomState(result.state);
+    } catch (error) {
+      setGameMessage(error.message);
     }
   });
 
 const requestedRoomCode = new URLSearchParams(window.location.search).get(
   "room",
 );
-const roomCode = requestedRoomCode || createRoomCode();
-const roomCodeElement = document.getElementById("lobby-code");
-roomCodeElement.dataset.code = roomCode;
-roomCodeElement.textContent = roomCode;
-if (!requestedRoomCode) {
-  const url = new URL(window.location.href);
-  url.searchParams.set("room", roomCode);
-  history.replaceState({}, "", url);
-}
-if (window.location.hash === "#lobby") show("lobby");
+document.getElementById("make-lobby").textContent = requestedRoomCode
+  ? "Join lobby"
+  : "Make lobby";
 loadPageTitles();
 loadRandomPlayerName();

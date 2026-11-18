@@ -134,6 +134,18 @@ button {
   text-decoration: underline;
 }
 
+.player-list {
+  width: fit-content;
+  margin: 0 auto 20px;
+  padding-left: 24px;
+  text-align: left;
+}
+
+.lobby-card button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .lobby-actions {
   display: flex;
   justify-content: center;
